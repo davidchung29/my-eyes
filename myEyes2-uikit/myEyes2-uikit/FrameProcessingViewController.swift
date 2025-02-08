@@ -49,6 +49,7 @@ class FrameProcessingViewController: UIViewController {
                 if let jsonResponse = try JSONSerialization.jsonObject(with: data) as? [String: Any],
                    let detectedObjects = jsonResponse["detected_objects"] as? [String] {
                     print("Detected Objects: \(detectedObjects)")
+                    speakWords(from: detectedObjects)
                 }
             } catch {
                 print("Error parsing response: \(error)")
