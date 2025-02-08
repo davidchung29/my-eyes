@@ -28,23 +28,27 @@ def detect_objects():
         return jsonify({"error": "No image data received"}), 400
 
     # Generate a unique filename
-    image_path = os.path.join(UPLOAD_FOLDER, f'received_image_{uuid.uuid4().hex}.jpg')
-    
-    # Save the image
+    if received % 2 == 0:
+        image_path = os.path.join(UPLOAD_FOLDER, f'received_image_{uuid.uuid4().hex}.jpg')
+        
+        # Save the image
 
-    image.save(image_path)
+        image.save(image_path)
 
-    detected_objects = processing.process(image_path)
+        detected_objects = processing.process(image_path)
+        
+        print(f"Image saved at {image_path}")
+        
+        # Dummy processing (just for example)
+        
+        # Return a JSON response
+        print(list(set(detected_objects)))
+        print({"detected_objects": detected_objects})
+        os.remove(image_path)
+        return jsonify({"detected_objects": detected_objects})
     
-    print(f"Image saved at {image_path}")
-    
-    # Dummy processing (just for example)
-    
-    # Return a JSON response
-    print(list(set(detected_objects)))
-    print({"detected_objects": detected_objects})
-    os.remove(image_path)
-    return jsonify({"detected_objects": detected_objects})
+    else:
+        return []
     
 
 

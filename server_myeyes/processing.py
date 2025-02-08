@@ -43,7 +43,7 @@ q = {
 
 tracker = DeepSort(max_age = 3)
 
-model = YOLO("yolov8l.pt")
+model = YOLO("yolov8m.pt")
 
 def priority(area, object, d_area):
     if d_area:
@@ -89,7 +89,8 @@ def process(image_path):
                         if curr_track.is_confirmed():
                             id = curr_track.track_id
                     
-                    if (x1 > 0.25*width and x1 < 0.75*width) or (x2 > 0.25*width and x2 < 0.75*width):
+                    
+                    if (xcenter > 0.25*width and xcenter < 0.75*width) or (xcenter < 0.25*width and x2 > 0.25*width) or (xcenter > 0.25*width and x1 < 0.75*width):
                         direction = " ahead"
 
                     else:
@@ -116,14 +117,19 @@ def process(image_path):
         print(f"detected the following items: {detected}\n")
 
         l = []
+        added = 0
 
-        while heap.heap:
+        while heap.heap and added < 2:
             x = heap.pop()
             print(x)
             if x[2] != " ahead":
                 continue
             else:
-                l.append(x[1] + x[2])
+                if (x[1] == "dining table"):
+                    l.append("table" + x[2])
+                else:
+                    l.append(x[1] + x[2])
+                added += 1
 
         print(l)
         return list(set(l))
