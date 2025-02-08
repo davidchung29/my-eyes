@@ -7,6 +7,7 @@ class ViewController: UIViewController {
     let previewLayer = AVCaptureVideoPreviewLayer()
     var frameProcessingQueue = DispatchQueue(label: "frameProcessingQueue")
     var shouldSendFrame = true // Control frame sending interval
+    let speechSynthesizer = AVSpeechSynthesizer() // Keep a reference to the synthesizer
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -113,11 +114,13 @@ extension ViewController: AVCaptureVideoDataOutputSampleBufferDelegate {
     }
 
     private func speakWords(from words: [String]) {
-        for word in words {
-            let utterance = AVSpeechUtterance(string: word)
-            utterance.voice = AVSpeechSynthesisVoice(language: "en-US")
-            utterance.rate = 0.5
-            AVSpeechSynthesizer().speak(utterance)
+        DispatchQueue.main.async { // Ensure this is run on the main thread
+            for word in words {
+                let utterance = AVSpeechUtterance(string: word)
+                utterance.voice = AVSpeechSynthesisVoice(language: "en-US")
+                utterance.rate = 0.5
+                self.speechSynthesizer.speak(utterance)
+            }
         }
     }
 }
