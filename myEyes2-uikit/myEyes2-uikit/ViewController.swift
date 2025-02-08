@@ -74,6 +74,7 @@ extension ViewController: AVCapturePhotoCaptureDelegate{
             return
         }
         let image = UIImage(data: data)
+        global.image = UIImage(data: data)
         let imageView = UIImageView(image: image)
         imageView.contentMode = .scaleAspectFit
         imageView.frame = view.bounds

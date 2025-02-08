@@ -22,7 +22,7 @@ class FrameProcessingViewController: UIViewController {
     
     @objc private func sendTestImage() {
         // Load the image from assets
-        guard let testImage = UIImage(named: "shreked.jpg") else {
+        guard let testImage = global.image else {
             print("Image not found")
             return
         }
