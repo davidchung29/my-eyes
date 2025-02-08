@@ -30,6 +30,11 @@ def detect_objects():
     # Save the image
     image.save(image_path)
     detected_objects = processing.process(image_path)
+    detected_objects = [
+    {"name": "Object1", "x": 100, "y": 200},
+    {"name": "Object2", "x": 150, "y": 250},
+    {"name": "Object3", "x": 300, "y": 400}
+    ]
     
     print(f"Image saved at {image_path}")
     

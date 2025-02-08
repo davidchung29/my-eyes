@@ -45,7 +45,7 @@ class FrameProcessingViewController: UIViewController {
         for word in words {
             let utterance = AVSpeechUtterance(string: word)
             utterance.voice = AVSpeechSynthesisVoice(language: "en-US")
-            utterance.rate = 0.5
+            utterance.rate = 0.6
             AVSpeechSynthesizer().speak(utterance)
         }
     }

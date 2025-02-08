@@ -148,6 +148,7 @@
 				DEVELOPMENT_TEAM = MXT6A94ZBK;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "myEyes2-uikit/Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = MyEyes;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;
 				INFOPLIST_KEY_UIMainStoryboardFile = Main;
@@ -177,6 +178,7 @@
 				DEVELOPMENT_TEAM = MXT6A94ZBK;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "myEyes2-uikit/Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = MyEyes;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;
 				INFOPLIST_KEY_UIMainStoryboardFile = Main;
