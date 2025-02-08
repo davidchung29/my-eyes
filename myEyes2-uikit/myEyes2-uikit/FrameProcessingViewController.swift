@@ -16,7 +16,7 @@ class FrameProcessingViewController: UIViewController {
     private func processFrame(image: UIImage) {
         guard let imageData = image.jpegData(compressionQuality: 0.8) else { return }
 
-        let url = URL(string: "http://172.26.44.238:5011/detect")!
+        let url = URL(string: "http://172.26.68.228:5058/detect")!//change this to be server url + /detect
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.httpBody = imageData

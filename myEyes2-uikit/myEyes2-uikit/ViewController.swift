@@ -82,7 +82,7 @@ extension ViewController: AVCaptureVideoDataOutputSampleBufferDelegate {
     private func sendFrameToServer(image: UIImage) {
         guard let imageData = image.jpegData(compressionQuality: 0.8) else { return }
 
-        let url = URL(string: "http://172.26.44.238:5011/detect")!
+        let url = URL(string: "http://172.26.68.228:5058/detect")!
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.httpBody = imageData
