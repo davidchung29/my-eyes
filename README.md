@@ -1,2 +1,3 @@
-# my-eyes
+# MyEyes
+navigate freely. live fully.
  
