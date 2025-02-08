@@ -5,6 +5,9 @@ class ViewController: UIViewController {
     var session: AVCaptureSession?
     let output = AVCaptureVideoDataOutput()
     let previewLayer = AVCaptureVideoPreviewLayer()
+    var frameProcessingQueue = DispatchQueue(label: "frameProcessingQueue")
+    var shouldSendFrame = true // Control frame sending interval
+    let speechSynthesizer = AVSpeechSynthesizer() // Keep a reference to the synthesizer
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -36,6 +39,7 @@ class ViewController: UIViewController {
 
     private func setCamera() {
         let session = AVCaptureSession()
+<<<<<<< HEAD
         guard let device = AVCaptureDevice.default(.builtInUltraWideCamera, for: .video, position: .back){
             do{
                 let input = try AVCaptureDeviceInput(device: device)
@@ -51,6 +55,17 @@ class ViewController: UIViewController {
                 self.session = session
             }
             output.setSampleBufferDelegate(self, queue: DispatchQueue(label: "videoQueue"))
+=======
+        guard let device = AVCaptureDevice.default(.builtInUltraWideCamera, for: .video, position: .back) else { return }
+
+        do {
+            let input = try AVCaptureDeviceInput(device: device)
+            if session.canAddInput(input) {
+                session.addInput(input)
+            }
+
+            output.setSampleBufferDelegate(self, queue: frameProcessingQueue)
+>>>>>>> 3789f8b8b72c6e4fd53cdfc1d2253f696d603d94
             if session.canAddOutput(output) {
                 session.addOutput(output)
             }
@@ -68,14 +83,62 @@ class ViewController: UIViewController {
 
 extension ViewController: AVCaptureVideoDataOutputSampleBufferDelegate {
     func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
+        guard shouldSendFrame else { return }
+
         guard let imageBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
         let ciImage = CIImage(cvPixelBuffer: imageBuffer)
         let image = UIImage(ciImage: ciImage)
         
-        DispatchQueue.main.async {
-            let frameVC = FrameProcessingViewController()
-            frameVC.capturedFrame = image
-            self.present(frameVC, animated: true)
+        shouldSendFrame = false // Throttle frame capture
+        sendFrameToServer(image: image)
+
+        // Reset frame capture after 1 second
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+            self.shouldSendFrame = true
+        }
+    }
+
+    private func sendFrameToServer(image: UIImage) {
+        guard let imageData = image.jpegData(compressionQuality: 0.8) else { return }
+
+        let url = URL(string: "http://172.26.68.228:5058/detect")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.httpBody = imageData
+        request.setValue("application/octet-stream", forHTTPHeaderField: "Content-Type")
+
+        let task = URLSession.shared.dataTask(with: request) { data, response, error in
+            if let error = error {
+                print("Error sending frame: \(error)")
+                return
+            }
+
+            guard let data = data else {
+                print("Error: No data received")
+                return
+            }
+
+            do {
+                if let jsonResponse = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+                   let detectedObjects = jsonResponse["detected_objects"] as? [String] {
+                    print("Detected Objects: \(detectedObjects)")
+                    self.speakWords(from: detectedObjects)
+                }
+            } catch {
+                print("Error parsing response: \(error)")
+            }
+        }
+        task.resume()
+    }
+
+    private func speakWords(from words: [String]) {
+        DispatchQueue.main.async { // Ensure this is run on the main thread
+            for word in words {
+                let utterance = AVSpeechUtterance(string: word)
+                utterance.voice = AVSpeechSynthesisVoice(language: "en-US")
+                utterance.rate = 0.5
+                self.speechSynthesizer.speak(utterance)
+            }
         }
     }
 }
