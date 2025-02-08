@@ -1,123 +1,61 @@
 import UIKit
+import ARKit
+import AudioToolbox
 import AVFoundation
 
 class ViewController: UIViewController {
-    var session: AVCaptureSession?
-    let output = AVCaptureVideoDataOutput()
-    let previewLayer = AVCaptureVideoPreviewLayer()
-    var frameProcessingQueue = DispatchQueue(label: "frameProcessingQueue")
-    var shouldSendFrame = true // Control frame sending interval
-    let speechSynthesizer = AVSpeechSynthesizer() // Keep a reference to the synthesizer
-
+    var sceneView: ARSCNView!
+    var isProcessingDepth = false
+    var alarmIsPlaying = false            // Flag to prevent repeated alarms
+    var lastFrameSent: TimeInterval = 0
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = .black
-        view.layer.addSublayer(previewLayer)
-        checkCamPerm()
+        setupARSceneView()
+        setupARSession()
     }
-
+    
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
-        previewLayer.frame = view.bounds
+        sceneView.frame = view.bounds
     }
-
-    private func checkCamPerm() {
-        switch AVCaptureDevice.authorizationStatus(for: .video) {
-        case .notDetermined:
-            AVCaptureDevice.requestAccess(for: .video) { [weak self] granted in
-                guard granted else { return }
-                DispatchQueue.main.async {
-                    self?.setCamera()
-                }
-            }
-        case .authorized:
-            setCamera()
-        default:
-            break
+    
+    private func setupARSceneView() {
+        sceneView = ARSCNView(frame: view.bounds)
+        view.addSubview(sceneView)
+        sceneView.delegate = self
+        sceneView.session.delegate = self
+    }
+    
+    private func setupARSession() {
+        let configuration = ARWorldTrackingConfiguration()
+        if ARWorldTrackingConfiguration.supportsFrameSemantics(.sceneDepth) {
+            configuration.frameSemantics = .sceneDepth
         }
+        sceneView.session.run(configuration)
     }
-
-    private func setCamera() {
-        let session = AVCaptureSession()
-<<<<<<< HEAD
-        guard let device = AVCaptureDevice.default(.builtInUltraWideCamera, for: .video, position: .back){
-            do{
-                let input = try AVCaptureDeviceInput(device: device)
-                if session.canAddInput(input){
-                    session.addInput(input)
-                }
-                if session.canAddOutput(output){
-                    session.addOutput(output)
-                }
-                previewLayer.videoGravity = .resizeAspectFill
-                previewLayer.session = session
-                session.startRunning()
-                self.session = session
-            }
-            output.setSampleBufferDelegate(self, queue: DispatchQueue(label: "videoQueue"))
-=======
-        guard let device = AVCaptureDevice.default(.builtInUltraWideCamera, for: .video, position: .back) else { return }
-
-        do {
-            let input = try AVCaptureDeviceInput(device: device)
-            if session.canAddInput(input) {
-                session.addInput(input)
-            }
-
-            output.setSampleBufferDelegate(self, queue: frameProcessingQueue)
->>>>>>> 3789f8b8b72c6e4fd53cdfc1d2253f696d603d94
-            if session.canAddOutput(output) {
-                session.addOutput(output)
-            }
-
-            previewLayer.videoGravity = .resizeAspectFill
-            previewLayer.session = session
-            session.startRunning()
-            self.session = session
-
-        } catch {
-            print(error)
-        }
+    
+    private func imageFromPixelBuffer(_ pixelBuffer: CVPixelBuffer) -> UIImage {
+        let ciImage = CIImage(cvPixelBuffer: pixelBuffer)
+        return UIImage(ciImage: ciImage)
     }
-}
-
-extension ViewController: AVCaptureVideoDataOutputSampleBufferDelegate {
-    func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
-        guard shouldSendFrame else { return }
-
-        guard let imageBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
-        let ciImage = CIImage(cvPixelBuffer: imageBuffer)
-        let image = UIImage(ciImage: ciImage)
-        
-        shouldSendFrame = false // Throttle frame capture
-        sendFrameToServer(image: image)
-
-        // Reset frame capture after 1 second
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
-            self.shouldSendFrame = true
-        }
-    }
-
+    
     private func sendFrameToServer(image: UIImage) {
         guard let imageData = image.jpegData(compressionQuality: 0.8) else { return }
-
         let url = URL(string: "http://172.26.68.228:5058/detect")!
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.httpBody = imageData
         request.setValue("application/octet-stream", forHTTPHeaderField: "Content-Type")
-
-        let task = URLSession.shared.dataTask(with: request) { data, response, error in
+        URLSession.shared.dataTask(with: request) { data, response, error in
             if let error = error {
                 print("Error sending frame: \(error)")
                 return
             }
-
             guard let data = data else {
                 print("Error: No data received")
                 return
             }
-
             do {
                 if let jsonResponse = try JSONSerialization.jsonObject(with: data) as? [String: Any],
                    let detectedObjects = jsonResponse["detected_objects"] as? [String] {
@@ -127,18 +65,93 @@ extension ViewController: AVCaptureVideoDataOutputSampleBufferDelegate {
             } catch {
                 print("Error parsing response: \(error)")
             }
-        }
-        task.resume()
+        }.resume()
     }
-
+    
     private func speakWords(from words: [String]) {
-        DispatchQueue.main.async { // Ensure this is run on the main thread
-            for word in words {
-                let utterance = AVSpeechUtterance(string: word)
-                utterance.voice = AVSpeechSynthesisVoice(language: "en-US")
-                utterance.rate = 0.5
-                self.speechSynthesizer.speak(utterance)
+        for word in words {
+            let utterance = AVSpeechUtterance(string: word)
+            utterance.voice = AVSpeechSynthesisVoice(language: "en-US")
+            utterance.rate = 0.5
+            AVSpeechSynthesizer().speak(utterance)
+        }
+    }
+    
+    func triggerAlarm() {
+        if !alarmIsPlaying {
+            alarmIsPlaying = true
+            AudioServicesPlaySystemSound(1005)
+            AudioServicesPlaySystemSound(kSystemSoundID_Vibrate)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+                self.alarmIsPlaying = false
             }
+        }
+    }
+}
+
+extension ViewController: ARSessionDelegate {
+    func session(_ session: ARSession, didUpdate frame: ARFrame) {
+        // Process LiDAR depth data without blocking the main thread.
+        // If a previous processing is in progress, skip this frame.
+        if isProcessingDepth { return }
+        isProcessingDepth = true
+        
+        DispatchQueue.global(qos: .userInitiated).async {
+            defer { self.isProcessingDepth = false }
+            
+            // Ensure we have scene depth data.
+            guard let sceneDepth = frame.sceneDepth else { return }
+            let depthMap = sceneDepth.depthMap
+            
+            // Lock the pixel buffer for safe reading.
+            CVPixelBufferLockBaseAddress(depthMap, .readOnly)
+            let width = CVPixelBufferGetWidth(depthMap)
+            let height = CVPixelBufferGetHeight(depthMap)
+            guard let baseAddress = CVPixelBufferGetBaseAddress(depthMap) else {
+                CVPixelBufferUnlockBaseAddress(depthMap, .readOnly)
+                return
+            }
+            let floatBuffer = baseAddress.assumingMemoryBound(to: Float32.self)
+            let threshold: Float = 0.91  // Approximately 2 feet in meters.
+            
+            let startX = width / 2 - width / 8
+            let endX   = width / 2 + width / 8
+            let startY = height / 2 - height / 8
+            let endY   = height / 2 + height / 8
+            let step = 5
+            var objectTooClose = false
+            
+            for y in stride(from: startY, to: endY, by: step) {
+                for x in stride(from: startX, to: endX, by: step) {
+                    let index = y * width + x
+                    let distance = floatBuffer[index]
+                    if distance > 0 && distance < threshold {
+                        objectTooClose = true
+                        break
+                    }
+                }
+                if objectTooClose { break }
+            }
+            CVPixelBufferUnlockBaseAddress(depthMap, .readOnly)
+            
+            if objectTooClose {
+                DispatchQueue.main.async {
+                    self.triggerAlarm()
+                }
+            }
+        }
+    }
+}
+
+extension ViewController: ARSCNViewDelegate {
+    func renderer(_ renderer: SCNSceneRenderer, updateAtTime time: TimeInterval) {
+        // Throttle frame sending—here, one frame per second.
+        if time - lastFrameSent > 1.0,
+           let currentFrame = sceneView.session.currentFrame {
+            lastFrameSent = time
+            let pixelBuffer = currentFrame.capturedImage
+            let image = imageFromPixelBuffer(pixelBuffer)
+            sendFrameToServer(image: image)
         }
     }
 }
