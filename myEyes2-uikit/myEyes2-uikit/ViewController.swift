@@ -8,11 +8,28 @@ class ViewController: UIViewController {
     var isProcessingDepth = false
     var alarmIsPlaying = false            // Flag to prevent repeated alarms
     var lastFrameSent: TimeInterval = 0
+    var lastCameraPosition: SIMD3<Float>? // Track last camera position
+    let movementThreshold: Float = 0.05   // Movement threshold in meters (e.g., 0.05 m = 5 cm)
+    
+    // Create a single, persistent AVSpeechSynthesizer.
+    let speechSynthesizer = AVSpeechSynthesizer()
+    
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = .black
         setupARSceneView()
         setupARSession()
+        let eyelidView = UIView(frame: self.view.bounds)
+        eyelidView.backgroundColor = .black
+        self.view.addSubview(eyelidView)
+        
+        // Animate the opening of the "eye"
+        UIView.animate(withDuration: 3.0, animations: {
+            eyelidView.alpha = 0 // Fade the eyelid view to reveal the screen
+        }) { _ in
+            // Remove the eyelid view once the animation completes
+            eyelidView.removeFromSuperview()
+        }
     }
     
     override func viewDidLayoutSubviews() {
@@ -42,11 +59,12 @@ class ViewController: UIViewController {
     
     private func sendFrameToServer(image: UIImage) {
         guard let imageData = image.jpegData(compressionQuality: 0.8) else { return }
-        let url = URL(string: "http://172.26.68.228:5058/detect")!
+        let url = URL(string: "http://172.20.10.5:5058/detect")!
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.httpBody = imageData
         request.setValue("application/octet-stream", forHTTPHeaderField: "Content-Type")
+        
         URLSession.shared.dataTask(with: request) { data, response, error in
             if let error = error {
                 print("Error sending frame: \(error)")
@@ -69,11 +87,15 @@ class ViewController: UIViewController {
     }
     
     private func speakWords(from words: [String]) {
-        for word in words {
-            let utterance = AVSpeechUtterance(string: word)
-            utterance.voice = AVSpeechSynthesisVoice(language: "en-US")
-            utterance.rate = 0.6
-            AVSpeechSynthesizer().speak(utterance)
+        DispatchQueue.main.async {
+            // Optionally, if you want to avoid overlapping speech, you could check if the synthesizer is speaking:
+            // if self.speechSynthesizer.isSpeaking { return }
+            for word in words {
+                let utterance = AVSpeechUtterance(string: word)
+                utterance.voice = AVSpeechSynthesisVoice(language: "en-US")
+                utterance.rate = 0.65
+                self.speechSynthesizer.speak(utterance)
+            }
         }
     }
     
@@ -92,7 +114,6 @@ class ViewController: UIViewController {
 extension ViewController: ARSessionDelegate {
     func session(_ session: ARSession, didUpdate frame: ARFrame) {
         // Process LiDAR depth data without blocking the main thread.
-        // If a previous processing is in progress, skip this frame.
         if isProcessingDepth { return }
         isProcessingDepth = true
         
@@ -112,7 +133,7 @@ extension ViewController: ARSessionDelegate {
                 return
             }
             let floatBuffer = baseAddress.assumingMemoryBound(to: Float32.self)
-            let threshold: Float = 0.91  // Approximately 2 feet in meters.
+            let threshold: Float = 0.75 // 2.5 feetish
             
             let startX = width / 2 - width / 8
             let endX   = width / 2 + width / 8
@@ -145,13 +166,33 @@ extension ViewController: ARSessionDelegate {
 
 extension ViewController: ARSCNViewDelegate {
     func renderer(_ renderer: SCNSceneRenderer, updateAtTime time: TimeInterval) {
-        // Throttle frame sending—here, one frame per second.
-        if time - lastFrameSent > 1.0,
-           let currentFrame = sceneView.session.currentFrame {
-            lastFrameSent = time
-            let pixelBuffer = currentFrame.capturedImage
-            let image = imageFromPixelBuffer(pixelBuffer)
-            sendFrameToServer(image: image)
+        // Only send frames when the device is moving.
+        guard let currentFrame = sceneView.session.currentFrame else { return }
+        
+        // Extract the current camera position from its transform.
+        let transform = currentFrame.camera.transform
+        let currentPosition = SIMD3<Float>(transform.columns.3.x, transform.columns.3.y, transform.columns.3.z)
+        
+        if let lastPos = lastCameraPosition {
+            let distance = simd_distance(lastPos, currentPosition)
+            // Only send a frame if the device has moved more than the threshold
+            // and at least 1 second has passed since the last frame was sent.
+            if distance > movementThreshold && (time - lastFrameSent > 1.0) {
+                lastFrameSent = time
+                lastCameraPosition = currentPosition
+                let pixelBuffer = currentFrame.capturedImage
+                let image = imageFromPixelBuffer(pixelBuffer)
+                sendFrameToServer(image: image)
+            }
+        } else {
+            // For the first frame, record the position and send a frame if throttling allows.
+            lastCameraPosition = currentPosition
+            if time - lastFrameSent > 1.0 {
+                lastFrameSent = time
+                let pixelBuffer = currentFrame.capturedImage
+                let image = imageFromPixelBuffer(pixelBuffer)
+                sendFrameToServer(image: image)
+            }
         }
     }
 }
