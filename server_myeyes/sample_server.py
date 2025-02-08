@@ -13,13 +13,15 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 @app.route('/detect', methods=['POST'])
 def detect_objects():
     # Check if image data is in the request
+    image_count= 0 
     if 'image' not in request.files and request.data:
         # Extract the image from raw byte stream
         image_data = request.data
         image = Image.open(io.BytesIO(image_data))
         
         # Save image to the temporary folder
-        image_path = os.path.join(UPLOAD_FOLDER, 'received_image.jpg')
+        image_path = os.path.join(UPLOAD_FOLDER, 'received_image.jpg' + image_count)
+        image_count +=1
         image.save(image_path)
         
         # Open the saved image to simulate processing
