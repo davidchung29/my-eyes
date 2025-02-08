@@ -4,122 +4,126 @@ import torch
 import os
 import time
 import fnmatch
+from PIL import Image
 from ultralytics import YOLO
-# from deep_sort_realtime.deepsort_tracker import DeepSort
-from heapq import heapify, heappop, heappush, nlargest
+from deep_sort_realtime.deepsort_tracker import DeepSort
+import heapq
 
+class H:
+    def __init__(self):
+        self.heap = []
+        self.lookup = {}
+
+    def push(self, item):
+        priority, key, value = item  
+        if key in self.lookup:
+
+            self.heap.remove(self.lookup[key])
+            heapq.heapify(self.heap) 
+
+        heapq.heappush(self.heap, item)
+        self.lookup[key] = item
+
+    def pop(self):
+        if self.heap:
+            item = heapq.heappop(self.heap)
+            del self.lookup[item[1]]
+            return item
+        return None
+
+    def __repr__(self):
+        return str(self.heap)
 
 q = {
     "person", "bicycle", "motorcycle", "bus", "truck", "traffic light",
     "fire hydrant", "stop sign", "parking meter", "bench", "chair", 
     "couch", "potted plant", "bed", "dining table", "toilet", 
-    "refrigerator", "book", "clock", "vase", "teddy bear"
+    "book", "clock"
 }
 
-model = YOLO("yolo11n.pt")
+tracker = DeepSort(max_age = 3)
 
-def priority(area, object):
-    return 0.4 * area + 0.6 * (int(object in q))
+model = YOLO("yolov8l.pt")
+
+def priority(area, object, d_area):
+    if d_area:
+        return round(area/100000 * max(1, (1 + 0.5*d_area)) * (1 + 0.25*(int(object in q))), 2)
+    else:
+        return round(0.4 * area / 100000 + 0.6 * (int(object in q)), 2)
 
 ## for frame-by-frame input:
 def process(image_path):
     image = cv2.imread(image_path)
     height, width, channels = image.shape
-#     (h, w) = image.shape[:2]
-#     center = (w // 2, h // 2)  # Center of rotation
 
-# # Compute the rotation matrix
-#     M = cv2.getRotationMatrix2D(center, 90, 1.0)  # (Center, Angle, Scale)
+    id_map = {}
 
-# # Perform the rotation
-#     image = cv2.warpAffine(image, M, (w, h))
-
-    heap = []
+    heap = H()
 
     results = model(image)
 
     detected = set()
+    all_detected = []
 
     for result in results:
         for box in result.boxes:
-            if (box.conf.item() >= 0.70):
+            if (box.conf.item() >= 0.50):
                 direction = " "
-                x1, y1, x2, y2 = map(int, box.xyxy[0])
-                xcenter = x1 + abs(x1 - x2) / 2
-                ycenter = y1 + abs(y1 - y2) / 2
-
-                if xcenter > width/2:
-                    direction += "right "
-                elif xcenter < width/2:
-                    direction += "left "
-                
-                if ycenter > height/2:
-                    direction += "up"
-                elif ycenter < height/2:
-                    direction += " down"
-                
+                x1, y1, x2, y2 = [int(x) for x in box.xyxy[0]]
+                conf = box.conf.item()
                 cls = int(box.cls[0])
-                detected.add(f"{model.names[cls]}")
-                cv2.rectangle(image, (x1, y1), (x2, y2), 255, 2)
-                area = abs((x1 - x2) * (y1 - y2))
-                cv2.putText(image, f"area: {area/100000}", (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
-                p = priority(area, model.names[cls])
-                heappush(heap, (p, model.names[cls]))
 
-    print(f"detected the following items: {detected}\n")
-    print(f"top priority objects: {[str(x) for x in list(heap[:3])]}")
-    cv2.destroyAllWindows()
+                if (model.names[cls] == "tv" or model.names[cls] == "airplane" or model.names[cls] == "refrigerator" or model.names[cls] == "laptop" or model.names[cls] == "cell phone"):
+                    continue
+                
+                else:
+                    xcenter = x1 + abs(x1 - x2) / 2
 
-    return [str(x[1] + direction) for x in list(heap[:3])]
+                    all_detected.append(([x1, y1, x2, y2], conf, cls))
+                    tracked_objects = tracker.update_tracks(all_detected, frame=image)
 
-    ## for video input:
+                    id = 0
 
-    # # Open the video file
-    # video_path = "/Users/albertluo/Desktop/edu/cmu/my-eyes/random-test-stuff/People Walking Free Stock Footage, Royalty-Free No Copyright Content 720.mp4"
-    # cap = cv2.VideoCapture(video_path)
+                    if tracked_objects:
+                        curr_track = tracked_objects[-1]
+                        if curr_track.is_confirmed():
+                            id = curr_track.track_id
+                    
+                    if (x1 > 0.25*width and x1 < 0.75*width) or (x2 > 0.25*width and x2 < 0.75*width):
+                        direction = " ahead"
 
-    # # Get video properties
-    # frame_width = int(cap.get(3))
-    # frame_height = int(cap.get(4))
-    # fps = int(cap.get(cv2.CAP_PROP_FPS))
+                    else:
+                        if xcenter > width/2:
+                            direction = " right"
+                        elif xcenter < width/2:
+                            direction = " left"
 
-    # # Define the codec and create VideoWriter to save output
-    # out = cv2.VideoWriter("random_people_walking_output_video.mp4", cv2.VideoWriter_fourcc(*'mp4v'), fps, (frame_width, frame_height))
+                    area = abs((x1 - x2) * (y1 - y2))
+                    d_area = None
 
-    # # Process video frame by frame
-    # while cap.isOpened():
-    #     success, frame = cap.read()
-    #     if not success:
-    #         break  # Break if video ends
+                    if (id in id_map):
+                        d_area = area - id_map[id]
+                    detected.add(f"{model.names[cls] + direction}")
+                    p = priority(area, model.names[cls], d_area)
+                    cv2.rectangle(image, (x1, y1), (x2, y2), (255, 0, 0), 2) 
+                    cv2.putText(image, f"{model.names[cls]+ direction} -- {p}", (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+                    cv2.imwrite(f'/Users/albertluo/Desktop/edu/cmu/my-eyes/server_myeyes/outputs/{image_path.split("/")[-1]}', image)
 
-    #     # Run YOLO on the frame
-    #     results = model(frame)
+                    heap.push((p, model.names[cls], direction))
 
-    #     # Draw bounding boxes
-    #     for result in results:
-    #         for box in result.boxes:
-    #             x1, y1, x2, y2 = map(int, box.xyxy[0])  # Bounding box coordinates
-    #             conf = box.conf[0].item()  # Confidence score
-    #             cls = int(box.cls[0])  # Class index
-    #             label = f"{model.names[cls]} {conf:.2f}"
+                    id_map[id] = area
 
-    #             # Draw rectangle and label
-    #             cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
-    #             cv2.putText(frame, label, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+        print(f"detected the following items: {detected}\n")
 
-    #     # Write the frame to output video
-    #     out.write(frame)
+        l = []
 
-    #     # Display the frame (optional)
-    #     cv2.imshow("YOLO Video", frame)
-    #     if cv2.waitKey(1) & 0xFF == ord('q'):  # Press 'q' to exit early
-    #         break
+        while heap.heap:
+            x = heap.pop()
+            print(x)
+            if x[2] != " ahead":
+                continue
+            else:
+                l.append(x[1] + x[2])
 
-    # # Release resources
-    # cap.release()
-    # out.release()
-    # cv2.destroyAllWindows()
-
-def __main__(file_path):
-    process(file_path)
-    os.remove(file_path)
+        print(l)
+        return list(set(l))

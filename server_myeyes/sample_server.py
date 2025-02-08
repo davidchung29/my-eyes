@@ -12,9 +12,12 @@ app = Flask(__name__)
 UPLOAD_FOLDER = "uploads"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
+received = 0
 
 @app.route('/detect', methods=['POST'])
 def detect_objects():
+    global received
+    received += 1
     # Handle file uploads or raw image bytes
     if 'image' in request.files:
         image = Image.open(request.files['image'])
@@ -28,7 +31,9 @@ def detect_objects():
     image_path = os.path.join(UPLOAD_FOLDER, f'received_image_{uuid.uuid4().hex}.jpg')
     
     # Save the image
+
     image.save(image_path)
+
     detected_objects = processing.process(image_path)
     detected_objects = [
     {"name": "Object1", "x": 100, "y": 200},
@@ -41,9 +46,11 @@ def detect_objects():
     # Dummy processing (just for example)
     
     # Return a JSON response
-    print(detected_objects)
+    print(list(set(detected_objects)))
     print({"detected_objects": detected_objects})
+    os.remove(image_path)
     return jsonify({"detected_objects": detected_objects})
+    
 
 
 if __name__ == "__main__":
