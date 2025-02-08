@@ -36,14 +36,20 @@ class ViewController: UIViewController {
 
     private func setCamera() {
         let session = AVCaptureSession()
-        guard let device = AVCaptureDevice.default(for: .video) else { return }
-
-        do {
-            let input = try AVCaptureDeviceInput(device: device)
-            if session.canAddInput(input) {
-                session.addInput(input)
+        guard let device = AVCaptureDevice.default(.builtInUltraWideCamera, for: .video, position: .back){
+            do{
+                let input = try AVCaptureDeviceInput(device: device)
+                if session.canAddInput(input){
+                    session.addInput(input)
+                }
+                if session.canAddOutput(output){
+                    session.addOutput(output)
+                }
+                previewLayer.videoGravity = .resizeAspectFill
+                previewLayer.session = session
+                session.startRunning()
+                self.session = session
             }
-
             output.setSampleBufferDelegate(self, queue: DispatchQueue(label: "videoQueue"))
             if session.canAddOutput(output) {
                 session.addOutput(output)
