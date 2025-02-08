@@ -3,6 +3,8 @@ from PIL import Image
 import io
 import os
 import uuid
+import processing
+import json
 
 app = Flask(__name__)
 
@@ -27,15 +29,18 @@ def detect_objects():
     
     # Save the image
     image.save(image_path)
+    detected_objects = processing.process(image_path)
     
     print(f"Image saved at {image_path}")
     
     # Dummy processing (just for example)
-    detected_objects = ["car", "person", "tree"]
     
     # Return a JSON response
+    print(detected_objects)
+    print({"detected_objects": detected_objects})
     return jsonify({"detected_objects": detected_objects})
 
 
 if __name__ == "__main__":
-    app.run(host='0.0.0.0', port=5011)
+    app.run(host='0.0.0.0', port=5058)
+
