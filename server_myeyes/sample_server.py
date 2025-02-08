@@ -36,8 +36,9 @@ def detect_objects():
     # Dummy processing (just for example)
     
     # Return a JSON response
-    print(detected_objects)
+    print(list(set(detected_objects)))
     print({"detected_objects": detected_objects})
+    os.remove(image_path)
     return jsonify({"detected_objects": detected_objects})
 
 
