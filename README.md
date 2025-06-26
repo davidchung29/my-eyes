@@ -34,7 +34,7 @@ This project was a collaborative effort. I, **David Chung**, was responsible for
 - **Integrated real-time communication with the Python Flask server** via HTTP requests for image analysis and voice response.
 - **Implemented voice output using `AVSpeechSynthesizer`** to provide accessible spoken feedback for visually impaired users.
 - **Engineered efficient view controller logic**, including asynchronous data handling and UI updates to ensure a seamless user experience.
-- **Led system integration efforts**, ensuring smooth coordination between client-side (iOS) and server-side (Flask) components.
+- **Led system integration efforts**, ensuring smooth coordination between client-side (iOS) and server-side (Flask) components. - **Utilized LiDAR technology** for enhanced scene understanding and spatial context recognition.
 - **Optimized image capture and transmission pipeline** to minimize latency and maximize reliability, especially in mobile network conditions.
 - **Streamlined memory usage and CPU overhead** in the app by profiling key UI interactions and leveraging lazy loading where applicable.
 - **Focused on clean architecture, code reusability, and responsiveness**, adhering to iOS best practices for accessibility and performance.
