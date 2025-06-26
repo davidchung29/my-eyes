@@ -1,7 +1,6 @@
 # MyEyes: Real-Time Object Detection with AR Navigation for the Visually Impaired
 
 **Author**: David Chung, Albert Luo, Richie Tran, Alvin Sung  
-**Contact**: [albertlu@andrew.cmu.edu](url), [richiet@andrew.cmu.edu](url), [alvins@andrew.cmu.edu](url), [dichung@andrew.cmu.edu](url)
 **Platform**: iOS (UIKit + ARKit) & Python (Flask + YOLOv8)  
 **Role**: iOS Frontend + ARKit Integration (Swift)  
 **Mentors**: Independently developed with backend model integration via REST APIs
